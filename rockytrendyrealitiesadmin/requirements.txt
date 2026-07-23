@@ -28,3 +28,4 @@ cloudinary
 python-jose[cryptography]
 python-multipart
 replicate
+passlib
