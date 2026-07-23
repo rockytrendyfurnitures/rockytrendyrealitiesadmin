@@ -29,3 +29,4 @@ python-jose[cryptography]
 python-multipart
 replicate
 passlib
+pydantic_settings
