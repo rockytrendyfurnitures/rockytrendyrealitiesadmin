@@ -32,7 +32,9 @@ from .models_schemas import (
     PaymentMethod,
     OTPPurpose,
     CheckoutRequest,
-    BannerCreateSchema
+    BannerCreateSchema,
+    PortfolioProject,
+    PortfolioCreateSchema
 )
 
 # IMPORT UTILS & CORE
@@ -432,6 +434,22 @@ async def create_banner_service(db: AsyncSession, banner_data: BannerCreateSchem
     await db.commit()
     log_action("banner_created", actor=admin_username, metadata={"section": banner_data.section_type.value})
     return new_banner
+
+async def create_portfolio_service(db: AsyncSession, data: PortfolioCreateSchema, admin_username: str = "system") -> PortfolioProject:
+    """Inserts a finished-job/house-contract showcase entry (image + description) into the portfolio."""
+    new_item = PortfolioProject(
+        title=data.title,
+        description=data.description,
+        location=data.location,
+        image_url=data.image_url,
+        display_order=data.display_order,
+        is_active=data.is_active,
+    )
+    db.add(new_item)
+    await db.commit()
+    await db.refresh(new_item)
+    log_action("portfolio_item_created", actor=admin_username, metadata={"title": data.title})
+    return new_item
 
 # =========================================================
 # 5. USER MODERATION & ADMINISTRATION CONTROLS

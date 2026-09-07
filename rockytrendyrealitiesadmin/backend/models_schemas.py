@@ -310,6 +310,23 @@ class Banner(Base, TimestampMixin):
     is_active = Column(Boolean, default=True)
 
 # ======================================================
+# PORTFOLIO MODEL (finished jobs / house contracts showcase)
+# ======================================================
+
+class PortfolioProject(Base, TimestampMixin):
+    __tablename__ = "portfolio_projects"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    location = Column(String(255), nullable=True)  # e.g. "Lekki, Lagos" — optional
+
+    image_url = Column(Text, nullable=False)
+
+    display_order = Column(Integer, default=0, index=True)
+    is_active = Column(Boolean, default=True, index=True)
+
+# ======================================================
 # PYDANTIC SCHEMAS (V2)
 # ======================================================
 
@@ -460,6 +477,33 @@ class BannerSchema(ORMBase):
     target_url: Optional[str]
     display_order: int
     is_active: bool
+
+# --- Portfolio Schemas (finished jobs / house contracts showcase) ---
+
+class PortfolioCreateSchema(BaseModel):
+    title: str
+    description: Optional[str] = None
+    location: Optional[str] = None
+    image_url: str
+    display_order: int = 0
+    is_active: bool = True
+
+class PortfolioSchema(ORMBase):
+    title: str
+    description: Optional[str]
+    location: Optional[str]
+    image_url: str
+    display_order: int
+    is_active: bool
+
+    @computed_field
+    @property
+    def optimized_url(self) -> Optional[str]:
+        """Automatically injects Cloudinary auto-optimization params if hosted on Cloudinary."""
+        if self.image_url and "res.cloudinary.com" in self.image_url and "/upload/" in self.image_url:
+            parts = self.image_url.split("/upload/")
+            return f"{parts[0]}/upload/f_auto,q_auto/{parts[1]}"
+        return self.image_url
 
 # Alias to resolve import errors in main.py or legacy routers
 PhysicalOrderCreate = CheckoutRequest

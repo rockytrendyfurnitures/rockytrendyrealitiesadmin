@@ -59,7 +59,8 @@ from .services import (
     process_paystack_webhook,
     process_paystack_callback,
     reconcile_stale_pending_orders,
-    moderate_user_service
+    moderate_user_service,
+    create_portfolio_service
 )
 from .ai_services import get_ai_service, AIService
 
@@ -82,7 +83,10 @@ from .models_schemas import (
     Order,
     OrderResponse,
     OrderStatus,
-    ProductCategory
+    ProductCategory,
+    PortfolioProject,
+    PortfolioSchema,
+    PortfolioCreateSchema
 )
 
 # =========================================================
@@ -291,6 +295,16 @@ async def get_banners(active: bool = True, db: AsyncSession = Depends(get_db)):
     if active:
         query = query.where(Banner.is_active == True)
     query = query.order_by(Banner.display_order)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+@catalog_router.get("/portfolio", response_model=List[PortfolioSchema])
+async def get_portfolio(active: bool = True, db: AsyncSession = Depends(get_db)):
+    """Public listing of finished-job / house-contract showcase entries."""
+    query = select(PortfolioProject)
+    if active:
+        query = query.where(PortfolioProject.is_active == True)
+    query = query.order_by(PortfolioProject.display_order, desc(PortfolioProject.id))
     result = await db.execute(query)
     return result.scalars().all()
 
@@ -721,6 +735,65 @@ async def delete_banner_route(
     
     log_action("banner_deleted", actor=f"admin_{admin.username}", metadata={"banner_id": banner_id})
     return {"status": "success", "detail": "Banner deleted successfully."}
+
+@admin_router.post("/portfolio", response_model=PortfolioSchema, status_code=status.HTTP_201_CREATED)
+async def create_portfolio_route(
+    title: str = Form(...),
+    description: Optional[str] = Form(None),
+    location: Optional[str] = Form(None),
+    display_order: int = Form(0),
+    is_active: bool = Form(True),
+    image_url: Optional[str] = Form(None),
+    file: Optional[UploadFile] = File(None),
+    db: AsyncSession = Depends(get_db),
+    admin: Admin = Depends(get_current_admin)
+):
+    final_image_url = image_url
+
+    if file and file.filename:
+        try:
+            upload_result = await asyncio.to_thread(
+                cloudinary.uploader.upload, file.file, folder="rtr_portfolio"
+            )
+            final_image_url = upload_result.get("secure_url")
+        except Exception as e:
+            logger.error(f"Cloudinary portfolio upload error: {e}")
+            raise HTTPException(status_code=400, detail=f"Portfolio Image Upload Error: {str(e)}")
+
+    if not final_image_url:
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload a photo or provide a valid image URL."
+        )
+
+    portfolio_data = PortfolioCreateSchema(
+        title=title,
+        description=description,
+        location=location,
+        image_url=final_image_url,
+        display_order=display_order,
+        is_active=is_active
+    )
+
+    return await create_portfolio_service(db, portfolio_data, admin.username)
+
+@admin_router.delete("/portfolio/{item_id}")
+async def delete_portfolio_route(
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: Admin = Depends(get_current_admin)
+):
+    result = await db.execute(select(PortfolioProject).where(PortfolioProject.id == item_id))
+    item = result.scalar_one_or_none()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Portfolio item not found.")
+
+    await db.delete(item)
+    await db.commit()
+
+    log_action("portfolio_item_deleted", actor=f"admin_{admin.username}", metadata={"item_id": item_id})
+    return {"status": "success", "detail": "Portfolio item deleted successfully."}
 
 
 # --- F. CONFIGURATION ROUTER ---
