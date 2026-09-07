@@ -56,6 +56,7 @@
       <main class="content">
         <div class="tabs" role="tablist">
           <button class="tab active" data-tab="panel-hero" role="tab">Hero &amp; Banners</button>
+          <button class="tab" data-tab="panel-portfolio" role="tab">Portfolio</button>
         </div>
 
         <!-- ===================== HERO & BANNERS ===================== -->
@@ -132,6 +133,50 @@
                 <div class="card-head"><div class="card-title">Existing Banners</div></div>
                 <div class="card-body"><div id="banner-list" class="grid gap-2"></div></div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================== PORTFOLIO (finished jobs / house contracts) ===================== -->
+        <div class="tab-panel" id="panel-portfolio" role="tabpanel">
+          <div class="two-col">
+            <!-- UPLOAD FORM -->
+            <div class="card">
+              <div class="card-head"><div class="card-title">Add a finished project</div></div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label for="portfolio-title">Project title</label>
+                  <input id="portfolio-title" type="text" placeholder="e.g. Lekki Phase 1 Living Room Finish" maxlength="255" />
+                </div>
+                <div class="form-group">
+                  <label for="portfolio-location">Location <span class="field-hint">optional</span></label>
+                  <input id="portfolio-location" type="text" placeholder="e.g. Lekki, Lagos" maxlength="255" />
+                </div>
+                <div class="form-group">
+                  <label for="portfolio-description">Description</label>
+                  <textarea id="portfolio-description" maxlength="2000" placeholder="A short note about the job — materials, scope, timeline…"></textarea>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="form-group">
+                  <label>Photo</label>
+                  <div class="upload-zone" id="portfolio-upload-zone">
+                    <input type="file" id="portfolio-file-input" accept="image/*" aria-label="Upload project photo" />
+                    <span class="uz-icon"><i data-lucide="image-plus"></i></span>
+                    <p>Click or drop a project photo</p>
+                    <small>JPG or WEBP recommended</small>
+                  </div>
+                </div>
+
+                <button class="btn btn-primary btn-block" id="portfolio-save"><i data-lucide="save"></i>Save Project</button>
+              </div>
+            </div>
+
+            <!-- LIST -->
+            <div class="card">
+              <div class="card-head"><div class="card-title">Portfolio</div></div>
+              <div class="card-body"><div id="portfolio-list" class="grid gap-2"></div></div>
             </div>
           </div>
         </div>
