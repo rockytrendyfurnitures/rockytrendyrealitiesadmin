@@ -287,6 +287,10 @@
     banners: (active = true) => APIClient.get(`/api/banners?active=${active}`),
     createBanner: (fd) => APIClient.upload('/api/admin/banners', fd, 'POST', { retries: 0 }),
     deleteBanner: (id) => APIClient.delete(`/api/admin/banners/${id}`, { retries: 0 }),
+
+    portfolio: (active = false) => APIClient.get(`/api/portfolio?active=${active}`),
+    createPortfolio: (fd) => APIClient.upload('/api/admin/portfolio', fd, 'POST', { retries: 0 }),
+    deletePortfolio: (id) => APIClient.delete(`/api/admin/portfolio/${id}`, { retries: 0 }),
     publicProducts: (params = {}) => APIClient.get(`/api/products${qs(params)}`),
   };
   const qs = (params) => {
@@ -1495,6 +1499,117 @@
   };
 
   /* ==============================================================
+     PORTFOLIO MODULE (finished jobs / house contracts showcase)
+     Lives on admin-content.html, second tab. Upload + list + delete
+     only — no edit, matching HeroModule's banner pattern.
+     ============================================================== */
+  const PortfolioModule = {
+    _file: null,
+
+    init() {
+      if (!$('#portfolio-list')) return; // panel not present on this page
+      this.bindUpload();
+      on($('#portfolio-save'), 'click', () => this.save());
+      on($('#portfolio-list'), 'click', (e) => {
+        const delBtn = e.target.closest('[data-delete-portfolio]');
+        if (delBtn) this.deleteItem(delBtn.dataset.deletePortfolio, delBtn);
+      });
+      this.load();
+    },
+
+    _setUploadZoneState(active, label) {
+      const zone = $('#portfolio-upload-zone'); if (!zone) return;
+      const icon = $('.uz-icon i', zone);
+      const text = $('p', zone);
+      zone.classList.toggle('has-file', active);
+      zone.style.borderColor = active ? 'var(--accent, #C4956A)' : '';
+      zone.style.background = active ? 'rgba(196,149,106,.08)' : '';
+      if (icon) icon.setAttribute('data-lucide', active ? 'check-circle' : 'image-plus');
+      if (text) text.textContent = active ? label : 'Click or drop a project photo';
+      refreshIcons();
+    },
+
+    bindUpload() {
+      const input = $('#portfolio-file-input');
+      on(input, 'change', (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        this._file = f;
+        this._setUploadZoneState(true, `Selected: ${f.name}`);
+      });
+    },
+
+    async load() {
+      const wrap = $('#portfolio-list'); if (!wrap) return;
+      try {
+        const items = await API.portfolio(false); // false = include inactive too, admin view
+        clear(wrap);
+        if (!items.length) { wrap.innerHTML = UI.empty('image', 'No portfolio items yet', 'Upload a finished job to begin.'); }
+        else {
+          items.forEach((p) => {
+            const card = el('div', { class: 'banner-card' });
+            card.innerHTML = `
+              <img class="banner-thumb" loading="lazy" src="${safeURL(p.optimized_url || p.image_url) || ''}" alt="" onerror="this.style.visibility='hidden'"/>
+              <div class="flex-1">
+                <div class="td-strong">${escapeHTML(p.title)}</div>
+                <div class="fs-xs text-muted">${escapeHTML(p.location || p.description || '')}</div>
+              </div>
+              <span class="badge no-dot ${p.is_active ? 'active' : 'neutral'}">${p.is_active ? 'Active' : 'Hidden'}</span>
+              <button class="icon-btn danger tooltip" data-tip="Delete" type="button" data-delete-portfolio="${p.id}"><i data-lucide="trash-2"></i></button>`;
+            wrap.appendChild(card);
+          });
+        }
+        refreshIcons();
+      } catch (e) {
+        Log.warn('portfolio', e.message);
+        wrap.innerHTML = UI.empty('image', 'Unable to load portfolio', '');
+        refreshIcons();
+      }
+    },
+
+    async save() {
+      const title = sanitizeInput($('#portfolio-title')?.value, 255);
+      if (!title) { Notify.warning('Give this project a title.'); return; }
+      if (!this._file) { Notify.warning('Please upload a photo of the finished job.'); return; }
+
+      const fd = new FormData();
+      fd.append('file', this._file);
+      fd.append('title', title);
+      fd.append('description', sanitizeInput($('#portfolio-description')?.value, 2000));
+      fd.append('location', sanitizeInput($('#portfolio-location')?.value, 255));
+      fd.append('is_active', 'true');
+
+      const btn = $('#portfolio-save'); const orig = btn.innerHTML;
+      btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-sm"></span> Saving…';
+      try {
+        await API.createPortfolio(fd);
+        Notify.success('Portfolio item saved');
+        this._file = null;
+        const input = $('#portfolio-file-input'); if (input) input.value = '';
+        this._setUploadZoneState(false);
+        ['#portfolio-title', '#portfolio-description', '#portfolio-location'].forEach((sel) => { const n = $(sel); if (n) n.value = ''; });
+        await this.load();
+      } catch (e) {
+        Log.error('save portfolio item', e);
+        Notify.error(e.message || 'Failed to save portfolio item');
+      } finally { btn.disabled = false; btn.innerHTML = orig; }
+    },
+
+    async deleteItem(id, btn) {
+      if (!confirm('Delete this portfolio item? This action cannot be undone.')) return;
+      if (btn) btn.disabled = true;
+      try {
+        await API.deletePortfolio(id);
+        Notify.success('Portfolio item deleted');
+        await this.load();
+      } catch (e) {
+        Log.error('delete portfolio item', e);
+        Notify.error(e.message || 'Failed to delete portfolio item');
+        if (btn) btn.disabled = false;
+      }
+    },
+  };
+
+  /* ==============================================================
      SHARED UI SNIPPETS
      ============================================================== */
   const UI = {
@@ -1551,7 +1666,7 @@
   const PAGE_MODULES = {
     dashboard: [DashboardModule, AnalyticsModule, OrdersModule, CustomersModule],
     products: [ProductsModule, ProductEditor, OrdersModule, CustomersModule, InventoryModule],
-    content: [HeroModule],
+    content: [HeroModule, PortfolioModule],
   };
 
   const App = {
@@ -1613,7 +1728,7 @@
     }
   };
 
-  window.RTR = Object.freeze({ API, Store, Auth, Notify, Modal, Drawer, EventBus, Fmt, CONFIG, Exporter, ProductEditor, ProductsModule, OrdersModule });
+  window.RTR = Object.freeze({ API, Store, Auth, Notify, Modal, Drawer, EventBus, Fmt, CONFIG, Exporter, ProductEditor, ProductsModule, OrdersModule, PortfolioModule });
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => App.init());
   else App.init();
