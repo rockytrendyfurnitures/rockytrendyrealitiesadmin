@@ -57,6 +57,7 @@
         <div class="tabs" role="tablist">
           <button class="tab active" data-tab="panel-hero" role="tab">Hero &amp; Banners</button>
           <button class="tab" data-tab="panel-portfolio" role="tab">Portfolio</button>
+          <button class="tab" data-tab="panel-concepts" role="tab">Concepts</button>
         </div>
 
         <!-- ===================== HERO & BANNERS ===================== -->
@@ -177,6 +178,51 @@
             <div class="card">
               <div class="card-head"><div class="card-title">Portfolio</div></div>
               <div class="card-body"><div id="portfolio-list" class="grid gap-2"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================== CONCEPTS (space design showcase, e.g. Kitchen) ===================== -->
+        <div class="tab-panel" id="panel-concepts" role="tabpanel">
+          <div class="two-col">
+            <!-- UPLOAD FORM -->
+            <div class="card">
+              <div class="card-head"><div class="card-title">Add a space concept</div></div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label for="concept-name">Concept name</label>
+                  <input id="concept-name" type="text" placeholder="e.g. Kitchen" maxlength="255" />
+                </div>
+                <div class="form-group">
+                  <label for="concept-location">Location <span class="field-hint">optional</span></label>
+                  <input id="concept-location" type="text" placeholder="e.g. Lekki, Lagos" maxlength="255" />
+                </div>
+                <div class="form-group">
+                  <label for="concept-description">Description</label>
+                  <textarea id="concept-description" maxlength="2000" placeholder="A short note about this space concept…"></textarea>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="form-group">
+                  <label>Photos <span class="field-hint">add as many as you like — they play as a slideshow</span></label>
+                  <div class="upload-zone" id="concept-upload-zone">
+                    <input type="file" id="concept-file-input" accept="image/*" multiple aria-label="Upload concept photos" />
+                    <span class="uz-icon"><i data-lucide="image-plus"></i></span>
+                    <p>Click or drop photos</p>
+                    <small>JPG or WEBP recommended · multiple files allowed</small>
+                  </div>
+                  <div id="concept-image-preview" class="image-preview-grid"></div>
+                </div>
+
+                <button class="btn btn-primary btn-block" id="concept-save"><i data-lucide="save"></i>Save Concept</button>
+              </div>
+            </div>
+
+            <!-- LIST -->
+            <div class="card">
+              <div class="card-head"><div class="card-title">Concepts</div></div>
+              <div class="card-body"><div id="concept-list" class="grid gap-2"></div></div>
             </div>
           </div>
         </div>
