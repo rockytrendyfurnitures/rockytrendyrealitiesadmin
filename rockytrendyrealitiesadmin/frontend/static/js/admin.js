@@ -291,6 +291,10 @@
     portfolio: (active = false) => APIClient.get(`/api/portfolio?active=${active}`),
     createPortfolio: (fd) => APIClient.upload('/api/admin/portfolio', fd, 'POST', { retries: 0 }),
     deletePortfolio: (id) => APIClient.delete(`/api/admin/portfolio/${id}`, { retries: 0 }),
+
+    concepts: (active = false) => APIClient.get(`/api/concepts?active=${active}`),
+    createConcept: (fd) => APIClient.upload('/api/admin/concepts', fd, 'POST', { retries: 0 }),
+    deleteConcept: (id) => APIClient.delete(`/api/admin/concepts/${id}`, { retries: 0 }),
     publicProducts: (params = {}) => APIClient.get(`/api/products${qs(params)}`),
   };
   const qs = (params) => {
@@ -1610,6 +1614,96 @@
   };
 
   /* ==============================================================
+     CONCEPTS MODULE (space design showcase — e.g. Kitchen, Living Room)
+     Lives on admin-content.html, third tab. Reuses the shared
+     ImageUpload module (multi-file, drag & drop) since a concept
+     can carry as many gallery photos as the admin chooses. Upload
+     + list + delete only, matching PortfolioModule's pattern.
+     ============================================================== */
+  const ConceptsModule = {
+    init() {
+      if (!$('#concept-list')) return; // panel not present on this page
+      ImageUpload.init('concept-upload-zone', 'concept-image-preview');
+      on($('#concept-save'), 'click', () => this.save());
+      on($('#concept-list'), 'click', (e) => {
+        const delBtn = e.target.closest('[data-delete-concept]');
+        if (delBtn) this.deleteItem(delBtn.dataset.deleteConcept, delBtn);
+      });
+      this.load();
+    },
+
+    async load() {
+      const wrap = $('#concept-list'); if (!wrap) return;
+      try {
+        const items = await API.concepts(false); // false = include inactive too, admin view
+        clear(wrap);
+        if (!items.length) { wrap.innerHTML = UI.empty('image', 'No concepts yet', 'Add a space concept to begin.'); }
+        else {
+          items.forEach((c) => {
+            const cover = (c.optimized_images && c.optimized_images[0]) || (c.images && c.images[0]) || '';
+            const count = (c.images || []).length;
+            const card = el('div', { class: 'banner-card' });
+            card.innerHTML = `
+              <img class="banner-thumb" loading="lazy" src="${safeURL(cover) || ''}" alt="" onerror="this.style.visibility='hidden'"/>
+              <div class="flex-1">
+                <div class="td-strong">${escapeHTML(c.name)}</div>
+                <div class="fs-xs text-muted">${escapeHTML(c.location || '')}${c.location && count ? ' · ' : ''}${count ? `${count} photo${count === 1 ? '' : 's'}` : ''}</div>
+              </div>
+              <span class="badge no-dot ${c.is_active ? 'active' : 'neutral'}">${c.is_active ? 'Active' : 'Hidden'}</span>
+              <button class="icon-btn danger tooltip" data-tip="Delete" type="button" data-delete-concept="${c.id}"><i data-lucide="trash-2"></i></button>`;
+            wrap.appendChild(card);
+          });
+        }
+        refreshIcons();
+      } catch (e) {
+        Log.warn('concepts', e.message);
+        wrap.innerHTML = UI.empty('image', 'Unable to load concepts', '');
+        refreshIcons();
+      }
+    },
+
+    async save() {
+      const name = sanitizeInput($('#concept-name')?.value, 255);
+      if (!name) { Notify.warning('Give this concept a name (e.g. Kitchen).'); return; }
+      if (!ImageUpload.files.length) { Notify.warning('Please upload at least one photo for this concept.'); return; }
+
+      const fd = new FormData();
+      fd.append('name', name);
+      fd.append('description', sanitizeInput($('#concept-description')?.value, 2000));
+      fd.append('location', sanitizeInput($('#concept-location')?.value, 255));
+      fd.append('is_active', 'true');
+      ImageUpload.files.forEach((f) => fd.append('files', f));
+
+      const btn = $('#concept-save'); const orig = btn.innerHTML;
+      btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-sm"></span> Saving…';
+      try {
+        await API.createConcept(fd);
+        Notify.success('Concept saved');
+        ImageUpload.reset();
+        ['#concept-name', '#concept-description', '#concept-location'].forEach((sel) => { const n = $(sel); if (n) n.value = ''; });
+        await this.load();
+      } catch (e) {
+        Log.error('save concept', e);
+        Notify.error(e.message || 'Failed to save concept');
+      } finally { btn.disabled = false; btn.innerHTML = orig; }
+    },
+
+    async deleteItem(id, btn) {
+      if (!confirm('Delete this concept? This action cannot be undone.')) return;
+      if (btn) btn.disabled = true;
+      try {
+        await API.deleteConcept(id);
+        Notify.success('Concept deleted');
+        await this.load();
+      } catch (e) {
+        Log.error('delete concept', e);
+        Notify.error(e.message || 'Failed to delete concept');
+        if (btn) btn.disabled = false;
+      }
+    },
+  };
+
+  /* ==============================================================
      SHARED UI SNIPPETS
      ============================================================== */
   const UI = {
@@ -1666,7 +1760,7 @@
   const PAGE_MODULES = {
     dashboard: [DashboardModule, AnalyticsModule, OrdersModule, CustomersModule],
     products: [ProductsModule, ProductEditor, OrdersModule, CustomersModule, InventoryModule],
-    content: [HeroModule, PortfolioModule],
+    content: [HeroModule, PortfolioModule, ConceptsModule],
   };
 
   const App = {
