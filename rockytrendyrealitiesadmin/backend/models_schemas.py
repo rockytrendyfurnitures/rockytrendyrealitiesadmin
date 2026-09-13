@@ -327,6 +327,25 @@ class PortfolioProject(Base, TimestampMixin):
     is_active = Column(Boolean, default=True, index=True)
 
 # ======================================================
+# SPACE CONCEPT MODEL (e.g. "Kitchen", "Living Room" — a styled
+# space showcase with a multi-photo gallery, description & location)
+# ======================================================
+
+class SpaceConcept(Base, TimestampMixin):
+    __tablename__ = "space_concepts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)  # e.g. "Kitchen"
+    description = Column(Text, nullable=True)
+    location = Column(String(255), nullable=True)  # e.g. "Lekki, Lagos" — optional
+
+    # Admin can attach as many photos as they like; rendered client-side as a slideshow.
+    images = Column(JSON, default=list)
+
+    display_order = Column(Integer, default=0, index=True)
+    is_active = Column(Boolean, default=True, index=True)
+
+# ======================================================
 # PYDANTIC SCHEMAS (V2)
 # ======================================================
 
@@ -504,6 +523,35 @@ class PortfolioSchema(ORMBase):
             parts = self.image_url.split("/upload/")
             return f"{parts[0]}/upload/f_auto,q_auto/{parts[1]}"
         return self.image_url
+
+# --- Space Concept Schemas (space showcase — e.g. Kitchen, Living Room) ---
+
+class ConceptCreateSchema(BaseModel):
+    name: str
+    description: Optional[str] = None
+    location: Optional[str] = None
+    images: List[str] = Field(default_factory=list)
+    display_order: int = 0
+    is_active: bool = True
+
+class ConceptSchema(ORMBase):
+    name: str
+    description: Optional[str]
+    location: Optional[str]
+    images: List[str]
+    display_order: int
+    is_active: bool
+
+    @computed_field
+    @property
+    def optimized_images(self) -> List[str]:
+        """Automatically injects Cloudinary auto-optimization params on every gallery image."""
+        def _optimize(url: Optional[str]) -> Optional[str]:
+            if url and "res.cloudinary.com" in url and "/upload/" in url:
+                parts = url.split("/upload/")
+                return f"{parts[0]}/upload/f_auto,q_auto/{parts[1]}"
+            return url
+        return [_optimize(u) for u in (self.images or [])]
 
 # Alias to resolve import errors in main.py or legacy routers
 PhysicalOrderCreate = CheckoutRequest

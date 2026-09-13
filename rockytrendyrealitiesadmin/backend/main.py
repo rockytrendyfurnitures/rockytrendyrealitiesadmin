@@ -60,7 +60,8 @@ from .services import (
     process_paystack_callback,
     reconcile_stale_pending_orders,
     moderate_user_service,
-    create_portfolio_service
+    create_portfolio_service,
+    create_concept_service
 )
 from .ai_services import get_ai_service, AIService
 
@@ -86,7 +87,10 @@ from .models_schemas import (
     ProductCategory,
     PortfolioProject,
     PortfolioSchema,
-    PortfolioCreateSchema
+    PortfolioCreateSchema,
+    SpaceConcept,
+    ConceptSchema,
+    ConceptCreateSchema
 )
 
 # =========================================================
@@ -305,6 +309,16 @@ async def get_portfolio(active: bool = True, db: AsyncSession = Depends(get_db))
     if active:
         query = query.where(PortfolioProject.is_active == True)
     query = query.order_by(PortfolioProject.display_order, desc(PortfolioProject.id))
+    result = await db.execute(query)
+    return result.scalars().all()
+
+@catalog_router.get("/concepts", response_model=List[ConceptSchema])
+async def get_concepts(active: bool = True, db: AsyncSession = Depends(get_db)):
+    """Public listing of space concepts (e.g. Kitchen, Living Room) with their photo galleries."""
+    query = select(SpaceConcept)
+    if active:
+        query = query.where(SpaceConcept.is_active == True)
+    query = query.order_by(SpaceConcept.display_order, desc(SpaceConcept.id))
     result = await db.execute(query)
     return result.scalars().all()
 
@@ -794,6 +808,66 @@ async def delete_portfolio_route(
 
     log_action("portfolio_item_deleted", actor=f"admin_{admin.username}", metadata={"item_id": item_id})
     return {"status": "success", "detail": "Portfolio item deleted successfully."}
+
+@admin_router.post("/concepts", response_model=ConceptSchema, status_code=status.HTTP_201_CREATED)
+async def create_concept_route(
+    name: str = Form(...),
+    description: Optional[str] = Form(None),
+    location: Optional[str] = Form(None),
+    display_order: int = Form(0),
+    is_active: bool = Form(True),
+    files: List[UploadFile] = File(...),
+    db: AsyncSession = Depends(get_db),
+    admin: Admin = Depends(get_current_admin)
+):
+    """Admin uploads a named space concept (e.g. 'Kitchen') with as many photos as they choose."""
+    image_urls: List[str] = []
+    for f in files:
+        if not f.filename:
+            continue
+        try:
+            upload_result = await asyncio.to_thread(
+                cloudinary.uploader.upload, f.file, folder="rtr_concepts"
+            )
+            image_urls.append(upload_result.get("secure_url"))
+        except Exception as e:
+            logger.error(f"Cloudinary concept upload error: {e}")
+            raise HTTPException(status_code=400, detail=f"Concept Image Upload Error: {str(e)}")
+
+    if not image_urls:
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload at least one photo for this concept."
+        )
+
+    concept_data = ConceptCreateSchema(
+        name=name,
+        description=description,
+        location=location,
+        images=image_urls,
+        display_order=display_order,
+        is_active=is_active
+    )
+
+    return await create_concept_service(db, concept_data, admin.username)
+
+@admin_router.delete("/concepts/{item_id}")
+async def delete_concept_route(
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: Admin = Depends(get_current_admin)
+):
+    result = await db.execute(select(SpaceConcept).where(SpaceConcept.id == item_id))
+    item = result.scalar_one_or_none()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Concept not found.")
+
+    await db.delete(item)
+    await db.commit()
+
+    log_action("concept_deleted", actor=f"admin_{admin.username}", metadata={"item_id": item_id})
+    return {"status": "success", "detail": "Concept deleted successfully."}
 
 
 # --- F. CONFIGURATION ROUTER ---

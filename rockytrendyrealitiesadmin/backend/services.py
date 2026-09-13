@@ -34,7 +34,9 @@ from .models_schemas import (
     CheckoutRequest,
     BannerCreateSchema,
     PortfolioProject,
-    PortfolioCreateSchema
+    PortfolioCreateSchema,
+    SpaceConcept,
+    ConceptCreateSchema
 )
 
 # IMPORT UTILS & CORE
@@ -449,6 +451,22 @@ async def create_portfolio_service(db: AsyncSession, data: PortfolioCreateSchema
     await db.commit()
     await db.refresh(new_item)
     log_action("portfolio_item_created", actor=admin_username, metadata={"title": data.title})
+    return new_item
+
+async def create_concept_service(db: AsyncSession, data: ConceptCreateSchema, admin_username: str = "system") -> SpaceConcept:
+    """Inserts a space concept (e.g. Kitchen, Living Room) with its photo gallery, description and location."""
+    new_item = SpaceConcept(
+        name=data.name,
+        description=data.description,
+        location=data.location,
+        images=data.images,
+        display_order=data.display_order,
+        is_active=data.is_active,
+    )
+    db.add(new_item)
+    await db.commit()
+    await db.refresh(new_item)
+    log_action("concept_created", actor=admin_username, metadata={"name": data.name})
     return new_item
 
 # =========================================================
