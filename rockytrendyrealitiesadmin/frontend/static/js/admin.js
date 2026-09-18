@@ -293,7 +293,7 @@
     deletePortfolio: (id) => APIClient.delete(`/api/admin/portfolio/${id}`, { retries: 0 }),
 
     concepts: (active = false) => APIClient.get(`/api/concepts?active=${active}`),
-    createConcept: (fd) => APIClient.upload('/api/admin/concepts', fd, 'POST', { retries: 0 }),
+    createConcept: (fd) => APIClient.upload('/api/admin/concepts', fd, 'POST', { retries: 0, timeout: 60000 }),
     deleteConcept: (id) => APIClient.delete(`/api/admin/concepts/${id}`, { retries: 0 }),
     publicProducts: (params = {}) => APIClient.get(`/api/products${qs(params)}`),
   };
