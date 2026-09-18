@@ -821,18 +821,23 @@ async def create_concept_route(
     admin: Admin = Depends(get_current_admin)
 ):
     """Admin uploads a named space concept (e.g. 'Kitchen') with as many photos as they choose."""
-    image_urls: List[str] = []
-    for f in files:
+
+    async def _upload_one(f: UploadFile) -> Optional[str]:
         if not f.filename:
-            continue
+            return None
         try:
             upload_result = await asyncio.to_thread(
                 cloudinary.uploader.upload, f.file, folder="rtr_concepts"
             )
-            image_urls.append(upload_result.get("secure_url"))
+            return upload_result.get("secure_url")
         except Exception as e:
             logger.error(f"Cloudinary concept upload error: {e}")
             raise HTTPException(status_code=400, detail=f"Concept Image Upload Error: {str(e)}")
+
+    # Upload every photo concurrently instead of one-by-one — with several
+    # photos, sequential uploads stack up and can blow past the client's
+    # request timeout (this was the cause of "failed to fetch" on save).
+    image_urls = [u for u in await asyncio.gather(*[_upload_one(f) for f in files]) if u]
 
     if not image_urls:
         raise HTTPException(
